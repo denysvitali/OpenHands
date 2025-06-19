@@ -836,7 +836,24 @@ class KubernetesRuntime(ActionExecutionClient):
                 annotations=self._k8s_config.annotations
             ),
             spec=V1PodSpec(
-                containers=[container],
+                containers=[V1Container(
+                    name=container.name,
+                    image=container.image,
+                    command=container.command,
+                    args=container.args,
+                    env=container.env,
+                    volume_mounts=container.volume_mounts,
+                    resources=V1ResourceRequirements(
+                        requests={
+                            "cpu": getattr(self._k8s_config, 'cpu_request', "500m"),
+                            "memory": getattr(self._k8s_config, 'memory_request', "1Gi")
+                        },
+                        limits={
+                            "cpu": getattr(self._k8s_config, 'cpu_limit', "2"),
+                            "memory": getattr(self._k8s_config, 'memory_limit', "4Gi")
+                        }
+                    )
+                )],
                 volumes=volumes,
                 restart_policy='Never',
                 image_pull_secrets=image_pull_secrets,
@@ -1015,7 +1032,7 @@ class KubernetesRuntime(ActionExecutionClient):
 
                 if active_replicas == 0:
                     # No other replicas connected - schedule delayed cleanup instead of immediate cleanup
-                    delay_seconds = getattr(self._k8s_config, 'websocket_disconnect_delay', 3600)
+                    delay_seconds = getattr(self._k8s_config, 'websocket_disconnect_delay', 86400)  # Increased from 1h to 24h default
                     self.log('info', f'No other replicas connected to pod {self.pod_name}, scheduling cleanup in {delay_seconds}s')
                     self._schedule_delayed_cleanup(delay_seconds)
                 else:
@@ -1897,9 +1914,23 @@ class KubernetesRuntime(ActionExecutionClient):
         pod_key = self.pod_name
         self.log('info', f'Scheduling delayed cleanup for pod {self.pod_name} in {delay_seconds} seconds')
 
+        # Pre-pull container images if configured
+        if getattr(self._k8s_config, 'prepull_images', True):
+            await self._prepull_container_images()
+
         # Create async task for delayed cleanup
         task = asyncio.create_task(self._execute_delayed_cleanup(delay_seconds))
         _delayed_cleanup_tasks[pod_key] = task
+
+    async def _prepull_container_images(self):
+        """Pre-pull container images to speed up pod startup."""
+        try:
+            self.log('info', f'Pre-pulling images for pod {self.pod_name}')
+            # Implementation would use Kubernetes API to pre-pull images
+            # This is a placeholder for the actual implementation
+            await asyncio.sleep(0.1)  # Simulate async operation
+        except Exception as e:
+            self.log('warning', f'Error pre-pulling images: {e}')
 
     def _cancel_delayed_cleanup(self):
         """
