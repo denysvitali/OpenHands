@@ -83,7 +83,7 @@ class KubernetesRuntime(ActionExecutionClient):
         headless_mode (bool, optional): Whether to run in headless mode. Defaults to True.
     """
 
-    _coordinator = None
+
 
     def __init__(
         self,
@@ -97,6 +97,7 @@ class KubernetesRuntime(ActionExecutionClient):
         headless_mode: bool = True,
     ):
         self._shutdown_listener_id: UUID | None = None
+        self._coordinator = None
 
         self.config = config
         self._runtime_initialized: bool = False
